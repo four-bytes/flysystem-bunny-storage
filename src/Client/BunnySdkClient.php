@@ -37,8 +37,10 @@ final class BunnySdkClient implements BunnyClientInterface
                     throw UnableToWriteFile::atLocation($path, 'could not read upload stream');
                 }
                 $this->sdk->putContents($path, $body);
-            } else {
+            } elseif (is_string($content)) {
                 $this->sdk->putContents($path, $content);
+            } else {
+                throw UnableToWriteFile::atLocation($path, 'content must be a string or resource');
             }
         } catch (AuthenticationException $e) {
             throw UnableToWriteFile::atLocation($path, 'authentication failed', $e);

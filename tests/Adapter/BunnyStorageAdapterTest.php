@@ -33,6 +33,9 @@ final class BunnyStorageAdapterTest extends TestCase
     public function testWriteStreamDelegatesToClient(): void
     {
         $stream = fopen('php://memory', 'r+');
+        if ($stream === false) {
+            self::fail('Could not open memory stream');
+        }
         $this->client->expects($this->once())->method('upload')->with('dir/file.txt', $stream);
 
         $this->adapter->writeStream('dir/file.txt', $stream, new Config());
@@ -49,6 +52,9 @@ final class BunnyStorageAdapterTest extends TestCase
     public function testReadStreamDelegatesToClient(): void
     {
         $stream = fopen('php://memory', 'r');
+        if ($stream === false) {
+            self::fail('Could not open memory stream');
+        }
         $this->client->method('downloadStream')->with('dir/file.txt')->willReturn($stream);
 
         $this->assertSame($stream, $this->adapter->readStream('dir/file.txt'));

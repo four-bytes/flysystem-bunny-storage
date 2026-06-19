@@ -7,7 +7,6 @@ namespace Four\Flysystem\BunnyStorage\Tests\Integration;
 use Four\Flysystem\BunnyStorage\Adapter\BunnyStorageAdapter;
 use Four\Flysystem\BunnyStorage\Client\BunnySdkClient;
 use Four\Flysystem\BunnyStorage\Config\BunnyStorageConfig;
-use League\Flysystem\Config;
 use League\Flysystem\Filesystem;
 use PHPUnit\Framework\TestCase;
 
@@ -50,7 +49,6 @@ final class BunnyStorageAdapterIntegrationTest extends TestCase
 
     protected function tearDown(): void
     {
-        // Best-effort cleanup of everything written under the test prefix.
         if (self::$fs !== null && isset(self::$prefix)) {
             try {
                 self::$fs->deleteDirectory(self::$prefix);
@@ -60,34 +58,43 @@ final class BunnyStorageAdapterIntegrationTest extends TestCase
         }
     }
 
+    private function fs(): Filesystem
+    {
+        if (self::$fs === null) {
+            throw new \LogicException('Filesystem not initialized — setUp should have skipped this test');
+        }
+
+        return self::$fs;
+    }
+
     public function testWriteAndRead(): void
     {
         $path = self::$prefix . 'hello.txt';
 
-        self::$fs->write($path, 'hello world');
+        $this->fs()->write($path, 'hello world');
 
-        $this->assertSame('hello world', self::$fs->read($path));
+        $this->assertSame('hello world', $this->fs()->read($path));
     }
 
     public function testFileExists(): void
     {
         $path = self::$prefix . 'exists.txt';
 
-        $this->assertFalse(self::$fs->fileExists($path));
+        $this->assertFalse($this->fs()->fileExists($path));
 
-        self::$fs->write($path, 'data');
+        $this->fs()->write($path, 'data');
 
-        $this->assertTrue(self::$fs->fileExists($path));
+        $this->assertTrue($this->fs()->fileExists($path));
     }
 
     public function testDelete(): void
     {
         $path = self::$prefix . 'delete.txt';
 
-        self::$fs->write($path, 'to delete');
-        self::$fs->delete($path);
+        $this->fs()->write($path, 'to delete');
+        $this->fs()->delete($path);
 
-        $this->assertFalse(self::$fs->fileExists($path));
+        $this->assertFalse($this->fs()->fileExists($path));
     }
 
     public function testCopy(): void
@@ -95,11 +102,11 @@ final class BunnyStorageAdapterIntegrationTest extends TestCase
         $src = self::$prefix . 'src.txt';
         $dst = self::$prefix . 'dst.txt';
 
-        self::$fs->write($src, 'copy me');
-        self::$fs->copy($src, $dst);
+        $this->fs()->write($src, 'copy me');
+        $this->fs()->copy($src, $dst);
 
-        $this->assertSame('copy me', self::$fs->read($dst));
-        $this->assertTrue(self::$fs->fileExists($src));
+        $this->assertSame('copy me', $this->fs()->read($dst));
+        $this->assertTrue($this->fs()->fileExists($src));
     }
 
     public function testMove(): void
@@ -107,35 +114,37 @@ final class BunnyStorageAdapterIntegrationTest extends TestCase
         $src = self::$prefix . 'move-src.txt';
         $dst = self::$prefix . 'move-dst.txt';
 
-        self::$fs->write($src, 'move me');
-        self::$fs->move($src, $dst);
+        $this->fs()->write($src, 'move me');
+        $this->fs()->move($src, $dst);
 
-        $this->assertFalse(self::$fs->fileExists($src));
-        $this->assertSame('move me', self::$fs->read($dst));
+        $this->assertFalse($this->fs()->fileExists($src));
+        $this->assertSame('move me', $this->fs()->read($dst));
     }
 
     public function testWriteAndReadStream(): void
     {
         $path   = self::$prefix . 'stream.txt';
         $source = fopen('php://memory', 'r+');
-        assert($source !== false);
+        if ($source === false) {
+            self::fail('Could not open memory stream');
+        }
         fwrite($source, 'streamed content');
         rewind($source);
 
-        self::$fs->writeStream($path, $source);
+        $this->fs()->writeStream($path, $source);
         fclose($source);
 
-        $stream = self::$fs->readStream($path);
+        $stream = $this->fs()->readStream($path);
         $this->assertSame('streamed content', stream_get_contents($stream));
         fclose($stream);
     }
 
     public function testListContents(): void
     {
-        self::$fs->write(self::$prefix . 'a.txt', 'a');
-        self::$fs->write(self::$prefix . 'b.txt', 'b');
+        $this->fs()->write(self::$prefix . 'a.txt', 'a');
+        $this->fs()->write(self::$prefix . 'b.txt', 'b');
 
-        $items = iterator_to_array(self::$fs->listContents(rtrim(self::$prefix, '/'), false), false);
+        $items = iterator_to_array($this->fs()->listContents(rtrim(self::$prefix, '/'), false), false);
 
         $names = array_map(fn ($i) => $i->path(), $items);
         $this->assertContains(rtrim(self::$prefix, '/') . '/a.txt', $names);
@@ -144,10 +153,10 @@ final class BunnyStorageAdapterIntegrationTest extends TestCase
 
     public function testListContentsDeep(): void
     {
-        self::$fs->write(self::$prefix . 'sub/nested.txt', 'nested');
+        $this->fs()->write(self::$prefix . 'sub/nested.txt', 'nested');
 
         $items = iterator_to_array(
-            self::$fs->listContents(rtrim(self::$prefix, '/'), true),
+            $this->fs()->listContents(rtrim(self::$prefix, '/'), true),
             false,
         );
 
@@ -163,19 +172,18 @@ final class BunnyStorageAdapterIntegrationTest extends TestCase
         $path = self::$prefix . 'sized.txt';
         $body = 'size test body';
 
-        self::$fs->write($path, $body);
+        $this->fs()->write($path, $body);
 
-        $this->assertSame(strlen($body), self::$fs->fileSize($path)->fileSize());
+        $this->assertSame(strlen($body), $this->fs()->fileSize($path));
     }
 
     public function testLastModified(): void
     {
         $path = self::$prefix . 'modified.txt';
 
-        self::$fs->write($path, 'ts');
+        $this->fs()->write($path, 'ts');
 
-        $ts = self::$fs->lastModified($path)->lastModified();
-        $this->assertNotNull($ts);
+        $ts = $this->fs()->lastModified($path);
         $this->assertGreaterThan(0, $ts);
     }
 
@@ -183,8 +191,8 @@ final class BunnyStorageAdapterIntegrationTest extends TestCase
     {
         $path = self::$prefix . 'image.png';
 
-        self::$fs->write($path, 'fake png bytes');
+        $this->fs()->write($path, 'fake png bytes');
 
-        $this->assertSame('image/png', self::$fs->mimeType($path)->mimeType());
+        $this->assertSame('image/png', $this->fs()->mimeType($path));
     }
 }
