@@ -58,7 +58,12 @@ final class BunnyStorageAdapter implements FilesystemAdapter
 
     public function deleteDirectory(string $path): void
     {
-        $this->client->delete(rtrim($path, '/') . '/');
+        // Bunny has no directory-delete API — enumerate all objects and delete individually.
+        foreach ($this->listContents($path, true) as $item) {
+            if ($item instanceof FileAttributes) {
+                $this->client->delete($item->path());
+            }
+        }
     }
 
     public function createDirectory(string $path, Config $config): void

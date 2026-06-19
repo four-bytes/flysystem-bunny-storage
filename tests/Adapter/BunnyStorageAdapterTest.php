@@ -62,18 +62,24 @@ final class BunnyStorageAdapterTest extends TestCase
         $this->adapter->delete('dir/file.txt');
     }
 
-    public function testDeleteDirectoryAppendsTrailingSlash(): void
+    public function testDeleteDirectoryDeletesAllContainedFiles(): void
     {
-        $this->client->expects($this->once())->method('delete')->with('dir/sub/');
+        $this->client->method('list')->with('dir/sub')->willReturn([
+            ['name' => 'dir/sub/a.txt', 'is_directory' => false, 'size' => 10, 'last_modified' => 0],
+            ['name' => 'dir/sub/b.txt', 'is_directory' => false, 'size' => 20, 'last_modified' => 0],
+        ]);
+        $this->client->expects($this->exactly(2))->method('delete')
+            ->with($this->logicalOr('dir/sub/a.txt', 'dir/sub/b.txt'));
 
         $this->adapter->deleteDirectory('dir/sub');
     }
 
-    public function testDeleteDirectoryStripsExtraTrailingSlash(): void
+    public function testDeleteDirectoryOnEmptyDirectoryDeletesNothing(): void
     {
-        $this->client->expects($this->once())->method('delete')->with('dir/sub/');
+        $this->client->method('list')->with('dir/empty')->willReturn([]);
+        $this->client->expects($this->never())->method('delete');
 
-        $this->adapter->deleteDirectory('dir/sub/');
+        $this->adapter->deleteDirectory('dir/empty');
     }
 
     public function testFileExistsDelegatesToClient(): void
