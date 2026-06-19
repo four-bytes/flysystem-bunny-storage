@@ -2,7 +2,7 @@
     "name": "four-bytes/flysystem-bunny-storage",
     "description": "Flysystem v3 adapter for Bunny Storage",
     "type": "library",
-    "license": "MIT",
+    "license": "Apache-2.0",
     "authors": [
         {
             "name": "Four Bytes",
