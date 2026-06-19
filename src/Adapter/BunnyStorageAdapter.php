@@ -6,13 +6,20 @@ namespace Four\Flysystem\BunnyStorage\Adapter;
 
 use Four\Flysystem\BunnyStorage\Client\BunnyClientInterface;
 use League\Flysystem\Config;
+use League\Flysystem\DirectoryAttributes;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\StorageAttributes;
+use League\MimeTypeDetection\ExtensionMimeTypeDetector;
 
 final class BunnyStorageAdapter implements FilesystemAdapter
 {
-    public function __construct(private readonly BunnyClientInterface $client) {}
+    private readonly ExtensionMimeTypeDetector $mimeDetector;
+
+    public function __construct(private readonly BunnyClientInterface $client)
+    {
+        $this->mimeDetector = new ExtensionMimeTypeDetector();
+    }
 
     public function fileExists(string $path): bool
     {
@@ -21,7 +28,7 @@ final class BunnyStorageAdapter implements FilesystemAdapter
 
     public function directoryExists(string $path): bool
     {
-        return $this->client->exists(rtrim($path, '/') . '/');
+        return $this->client->directoryExists($path);
     }
 
     public function write(string $path, string $contents, Config $config): void
@@ -71,17 +78,38 @@ final class BunnyStorageAdapter implements FilesystemAdapter
 
     public function mimeType(string $path): FileAttributes
     {
-        return new FileAttributes($path);
+        $mime = $this->mimeDetector->detectMimeTypeFromPath($path) ?? 'application/octet-stream';
+
+        return new FileAttributes($path, null, null, null, $mime);
     }
 
     public function lastModified(string $path): FileAttributes
     {
-        return new FileAttributes($path);
+        $entry = $this->findEntry($path);
+
+        return new FileAttributes($path, null, null, $entry['last_modified'] ?? null);
     }
 
     public function fileSize(string $path): FileAttributes
     {
-        return new FileAttributes($path);
+        $entry = $this->findEntry($path);
+
+        return new FileAttributes($path, $entry['size'] ?? null);
+    }
+
+    /** @return array{name: string, is_directory: bool, size: int, last_modified: int}|null */
+    private function findEntry(string $path): ?array
+    {
+        $dir = dirname($path);
+        $entries = $this->client->list($dir === '.' ? '' : $dir);
+
+        foreach ($entries as $entry) {
+            if ($entry['name'] === $path) {
+                return $entry;
+            }
+        }
+
+        return null;
     }
 
     public function listContents(string $path, bool $deep): iterable
@@ -90,7 +118,7 @@ final class BunnyStorageAdapter implements FilesystemAdapter
 
         foreach ($entries as $entry) {
             if ($entry['is_directory']) {
-                yield new \League\Flysystem\DirectoryAttributes($entry['name']);
+                yield new DirectoryAttributes($entry['name']);
                 if ($deep) {
                     yield from $this->listContents($entry['name'], true);
                 }

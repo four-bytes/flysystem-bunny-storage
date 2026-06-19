@@ -83,9 +83,9 @@ final class BunnyStorageAdapterTest extends TestCase
         $this->assertTrue($this->adapter->fileExists('file.txt'));
     }
 
-    public function testDirectoryExistsAppendsTrailingSlash(): void
+    public function testDirectoryExistsDelegatesToClientDirectoryExists(): void
     {
-        $this->client->method('exists')->with('dir/')->willReturn(true);
+        $this->client->method('directoryExists')->with('dir')->willReturn(true);
 
         $this->assertTrue($this->adapter->directoryExists('dir'));
     }

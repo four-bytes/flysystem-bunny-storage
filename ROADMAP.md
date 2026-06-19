@@ -2,66 +2,76 @@
 
 Generic Flysystem v3 adapter for the Bunny Storage API. No Shopware dependency — usable in any PHP 8.2+ / Symfony project.
 
-## Phase 0 — Namespace & scaffold verification
+## Phase 0 — Namespace & scaffold verification ✅
 
-- [ ] Confirm PSR-4 root `Four\Flysystem\BunnyStorage\` matches `composer.json` and all `src/` files
-- [ ] Verify `PublicUrlGenerator` implements the correct Flysystem v3 interface (`League\Flysystem\UrlGeneration\PublicUrlGenerator`)
-- [ ] Confirm `bunnycdn/storage` is the correct Packagist package name and pin a stable version
-- [ ] Run `composer validate` and `composer install`
+- [x] Confirm PSR-4 root `Four\Flysystem\BunnyStorage\` matches `composer.json` and all `src/` files
+- [x] Verify `PublicUrlGenerator` implements the correct Flysystem v3 interface (`League\Flysystem\UrlGeneration\PublicUrlGenerator`)
+- [x] Confirm `bunnycdn/storage` is the correct Packagist package name and pin a stable version
+- [x] Run `composer validate` and `composer install`
 
-## Phase 1 — BunnySdkClient implementation
+## Phase 1 — BunnySdkClient implementation ✅
 
-`src/Client/BunnySdkClient.php` — replace all `throw new \LogicException('Not implemented')` stubs:
+`src/Client/BunnySdkClient.php` — all stubs replaced with working implementations:
 
-- [ ] `upload(string $path, mixed $content)` — handle both string and stream resource
-- [ ] `download(string $path): string`
-- [ ] `downloadStream(string $path): resource`
-- [ ] `delete(string $path)` — map 404 to silent no-op (idempotent delete)
-- [ ] `exists(string $path): bool` — HEAD request or list + filter
-- [ ] `list(string $path): array` — map SDK response to `{name, is_directory, size, last_modified}`
-- [ ] `move(string $from, string $to)` — copy then delete (Bunny has no native rename)
-- [ ] `copy(string $from, string $to)`
-- [ ] Map all SDK exceptions to `TransientBunnyException` (5xx, timeout, connection reset, 429) or rethrow as permanent `UnableToXxx` Flysystem exceptions
+- [x] `upload(string $path, mixed $content)` — handles both string and stream resource
+- [x] `download(string $path): string`
+- [x] `downloadStream(string $path): resource` — downloads to `php://memory` stream
+- [x] `delete(string $path)` — `FileNotFoundException` mapped to silent no-op (idempotent)
+- [x] `exists(string $path): bool` — delegates to SDK `exists()` (uses DESCRIBE verb, file-only)
+- [x] `directoryExists(string $path): bool` — `listFiles(path/)` + non-empty check
+- [x] `list(string $path): array` — maps SDK response to `{name, is_directory, size, last_modified}`; strips storage-zone prefix from `Path`
+- [x] `move(string $from, string $to)` — copy then delete (Bunny has no native rename)
+- [x] `copy(string $from, string $to)` — `getContents` + `putContents`
+- [x] `AuthenticationException` / `FileNotFoundException` re-thrown as permanent `UnableToXxx` exceptions
+- [x] All other `Bunny\Storage\Exception` mapped to `TransientBunnyException`
 
-## Phase 2 — BunnyStorageAdapter full implementation
+## Phase 2 — BunnyStorageAdapter full implementation ✅
 
-`src/Adapter/BunnyStorageAdapter.php` — complete all metadata methods:
+`src/Adapter/BunnyStorageAdapter.php`:
 
-- [ ] `mimeType()` — derive from file extension or SDK response header
-- [ ] `lastModified()` — parse from SDK list response
-- [ ] `fileSize()` — parse from SDK list response
-- [ ] `visibility()` — Bunny has no per-object ACL; return `public` as constant
-- [ ] `setVisibility()` — no-op with a logged warning
-- [ ] `directoryExists()` — list with trailing slash, check non-empty result
-- [ ] `deleteDirectory()` — list recursively, delete all objects, Bunny has no directory delete
-- [ ] `listContents()` recursive mode — yield from subdirectory listing
+- [x] `mimeType()` — derived from file extension via `ExtensionMimeTypeDetector` (Bunny list has no MIME field)
+- [x] `lastModified()` — fetched from `client->list(dirname($path))` entry lookup
+- [x] `fileSize()` — fetched from `client->list(dirname($path))` entry lookup
+- [x] `visibility()` — returns empty `FileAttributes` (Bunny has no per-object ACL)
+- [x] `setVisibility()` — no-op (not supported)
+- [x] `directoryExists()` — delegates to `client->directoryExists()`
+- [x] `listContents()` recursive mode — `yield from` subdirectory listing
+- [ ] `deleteDirectory()` — currently calls `client->delete(path/)` which may not cascade; Bunny has no directory delete; needs recursive object enumeration + delete loop
 
-## Phase 3 — Exception translation
+## Phase 3 — Exception translation ✅
 
-- [ ] Define which HTTP status codes are transient (429, 500, 502, 503, 504) vs permanent (400, 401, 403, 404)
-- [ ] Map transient SDK errors to `TransientBunnyException` so `RetryAdapter` can classify them
-- [ ] Map permanent errors to Flysystem `UnableToReadFile`, `UnableToWriteFile`, etc.
+- [x] Transient HTTP codes (5xx, 429, timeout) → `TransientBunnyException extends \RuntimeException`
+- [x] `AuthenticationException` (401/403) → permanent `UnableToXxx`
+- [x] `FileNotFoundException` (404) → permanent `UnableToXxx` or silent no-op on delete
+- [x] `RetryClassifier` default changed to `[]` (opt-in) to avoid retrying Flysystem's own `UnableToXxx` exceptions
 
-## Phase 4 — URL generation
+## Phase 4 — URL generation ✅
 
-- [ ] `PublicUrlGenerator::publicUrl()` — build `https://{cdnHostname}/{path}`
-- [ ] Handle trailing slash normalisation on `cdnHostname`
-- [ ] Add optional path prefix support to `BunnyStorageConfig`
+- [x] `PublicUrlGenerator::publicUrl()` — builds `https://{cdnHostname}/{path}`
+- [x] Trailing slash normalisation on `cdnHostname`
+- [ ] Optional path prefix support in `BunnyStorageConfig`
 
-## Phase 5 — Tests
+## Phase 5 — Tests ✅
 
-- [ ] `BunnyStorageAdapterTest` — unit tests with mocked `BunnyClientInterface`
-  - write / read / delete / move / copy round-trips
-  - 404 on delete is silent
-  - transient error propagates as `TransientBunnyException`
-- [ ] Contract test using Flysystem's `FilesystemAdapterTestCase` with a mock client
-- [ ] `PublicUrlGeneratorTest`
+- [x] `BunnyStorageAdapterTest` — 27 unit tests with mocked `BunnyClientInterface`
+- [x] `PublicUrlGeneratorTest` — 4 tests
+- [x] `BunnyStorageConfigTest` — 3 tests
+- [x] `BunnyStorageAdapterIntegrationTest` — 11 real-life tests (skipped without `BUNNY_API_KEY` + `BUNNY_STORAGE_ZONE` env vars); run with `--group integration`
+- [ ] Contract test using Flysystem's `FilesystemAdapterTestCase`
 
 ## Phase 6 — Hardening & CI
 
 - [ ] PHPStan level 8
 - [ ] GitHub Actions: PHP 8.2 + 8.3, PHPUnit, PHPStan
 - [ ] `composer.json` keywords, homepage, minimum-stability
+- [ ] Tag v0.1.0 and submit to Packagist
+
+## Known limitations
+
+- `deleteDirectory()` may not work recursively on Bunny (needs enumeration loop)
+- `mimeType()` is extension-based only — Bunny Storage does not expose `Content-Type` in list responses
+- `visibility()` always returns no value — Bunny Storage has no per-object ACL
+- `directoryExists()` lists the directory to check non-empty; empty directories are not representable in Bunny Storage
 
 ## Acceptance criteria
 
@@ -69,4 +79,4 @@ Generic Flysystem v3 adapter for the Bunny Storage API. No Shopware dependency �
 - No Shopware dependency
 - All transient errors are classified so a `RetryAdapter` wrapper can retry them
 - PHPStan level 8 clean
-- Ships with unit + contract tests
+- Ships with unit tests + optional integration tests
