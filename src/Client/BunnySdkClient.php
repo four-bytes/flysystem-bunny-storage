@@ -11,6 +11,7 @@ use Bunny\Storage\FileInfo;
 use Bunny\Storage\FileNotFoundException;
 use Four\Flysystem\BunnyStorage\Config\BunnyStorageConfig;
 use Four\Flysystem\BunnyStorage\Exception\TransientBunnyException;
+use GuzzleHttp\Promise\PromiseInterface;
 use League\Flysystem\UnableToCheckExistence;
 use League\Flysystem\UnableToCopyFile;
 use League\Flysystem\UnableToDeleteFile;
@@ -18,14 +19,14 @@ use League\Flysystem\UnableToMoveFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToWriteFile;
 
-final class BunnySdkClient implements BunnyClientInterface
+final class BunnySdkClient implements AsyncBunnyClientInterface
 {
     private readonly Client $sdk;
     private readonly string $storageZone;
 
-    public function __construct(private readonly BunnyStorageConfig $config)
+    public function __construct(private readonly BunnyStorageConfig $config, ?Client $sdk = null)
     {
-        $this->sdk = new Client($config->apiKey, $config->storageZone, $config->region);
+        $this->sdk = $sdk ?? new Client($config->apiKey, $config->storageZone, $config->region);
         $this->storageZone = $config->storageZone;
     }
 
@@ -48,6 +49,71 @@ final class BunnySdkClient implements BunnyClientInterface
         } catch (BunnyException $e) {
             throw new TransientBunnyException("Upload failed for '{$path}': {$e->getMessage()}", 0, $e);
         }
+    }
+
+    public function uploadAsync(string $path, mixed $content): PromiseInterface
+    {
+        $tmpFile = tempnam(sys_get_temp_dir(), 'bunny_');
+        if ($tmpFile === false) {
+            throw UnableToWriteFile::atLocation($path, 'could not create temporary file');
+        }
+
+        if (is_resource($content)) {
+            $body = stream_get_contents($content);
+            if ($body === false) {
+                unlink($tmpFile);
+                throw UnableToWriteFile::atLocation($path, 'could not read upload stream');
+            }
+            $written = file_put_contents($tmpFile, $body);
+        } elseif (is_string($content)) {
+            $written = file_put_contents($tmpFile, $content);
+        } else {
+            unlink($tmpFile);
+            throw UnableToWriteFile::atLocation($path, 'content must be a string or resource');
+        }
+
+        if ($written === false) {
+            unlink($tmpFile);
+            throw UnableToWriteFile::atLocation($path, 'could not write to temporary file');
+        }
+
+        try {
+            $promise = $this->sdk->uploadAsync($tmpFile, $path);
+        } catch (AuthenticationException $e) {
+            @unlink($tmpFile);
+            throw UnableToWriteFile::atLocation($path, 'authentication failed', $e);
+        } catch (FileNotFoundException $e) {
+            @unlink($tmpFile);
+            throw UnableToWriteFile::atLocation($path, 'file not found', $e);
+        } catch (BunnyException $e) {
+            @unlink($tmpFile);
+            throw new TransientBunnyException("Upload failed for '{$path}': {$e->getMessage()}", 0, $e);
+        } catch (\Throwable $e) {
+            @unlink($tmpFile);
+            throw $e;
+        }
+
+        return $promise->then(
+            function (mixed $value) use ($tmpFile): mixed {
+                @unlink($tmpFile);
+                return $value;
+            },
+            function (mixed $reason) use ($tmpFile, $path): never {
+                @unlink($tmpFile);
+                if ($reason instanceof AuthenticationException) {
+                    throw UnableToWriteFile::atLocation($path, 'authentication failed', $reason);
+                }
+                if ($reason instanceof FileNotFoundException) {
+                    throw UnableToWriteFile::atLocation($path, 'file not found', $reason);
+                }
+                if ($reason instanceof BunnyException) {
+                    throw new TransientBunnyException("Upload failed for '{$path}': {$reason->getMessage()}", 0, $reason);
+                }
+                throw $reason instanceof \Throwable
+                    ? new TransientBunnyException("Upload failed for '{$path}': {$reason->getMessage()}", 0, $reason)
+                    : new \RuntimeException('Upload failed: ' . (string) $reason);
+            }
+        );
     }
 
     public function download(string $path): string
