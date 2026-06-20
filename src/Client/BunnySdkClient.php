@@ -7,6 +7,7 @@ namespace Four\Flysystem\BunnyStorage\Client;
 use Bunny\Storage\AuthenticationException;
 use Bunny\Storage\Client;
 use Bunny\Storage\Exception as BunnyException;
+use Bunny\Storage\FileInfo;
 use Bunny\Storage\FileNotFoundException;
 use Four\Flysystem\BunnyStorage\Config\BunnyStorageConfig;
 use Four\Flysystem\BunnyStorage\Exception\TransientBunnyException;
@@ -105,7 +106,7 @@ final class BunnySdkClient implements BunnyClientInterface
     {
         try {
             $entries = $this->sdk->listFiles(rtrim($path, '/') . '/');
-            return is_array($entries) && count($entries) > 0;
+            return count($entries) > 0;
         } catch (AuthenticationException $e) {
             throw UnableToCheckExistence::forLocation($path, $e);
         } catch (BunnyException $e) {
@@ -123,17 +124,14 @@ final class BunnySdkClient implements BunnyClientInterface
             throw new TransientBunnyException("List failed for '{$path}': {$e->getMessage()}", 0, $e);
         }
 
-        if (!is_array($raw)) {
-            return [];
-        }
-
         $entries = [];
         foreach ($raw as $item) {
             $entries[] = [
                 'name' => $this->resolveEntryPath($item),
-                'is_directory' => (bool) ($item['IsDirectory'] ?? false),
-                'size' => (int) ($item['Length'] ?? 0),
-                'last_modified' => isset($item['LastChanged']) ? (int) strtotime($item['LastChanged']) : 0,
+                'is_directory' => $item->isDirectory(),
+                'size' => $item->getSize(),
+                'last_modified' => $item->getDateModified()->getTimestamp(),
+                'checksum' => $item->getChecksum(),
             ];
         }
 
@@ -164,17 +162,16 @@ final class BunnySdkClient implements BunnyClientInterface
         }
     }
 
-    /** @param array<string, mixed> $item */
-    private function resolveEntryPath(array $item): string
+    private function resolveEntryPath(FileInfo $item): string
     {
         // Bunny Path = "/storageZone/dir/" — strip leading slash and zone prefix
-        $dir = ltrim((string) ($item['Path'] ?? '/'), '/');
+        $dir = ltrim($item->getPath(), '/');
         $prefix = $this->storageZone . '/';
 
         if (str_starts_with($dir, $prefix)) {
             $dir = substr($dir, strlen($prefix));
         }
 
-        return $dir . ($item['ObjectName'] ?? '');
+        return $dir . $item->getName();
     }
 }

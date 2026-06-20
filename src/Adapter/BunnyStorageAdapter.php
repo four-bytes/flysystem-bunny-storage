@@ -92,17 +92,17 @@ final class BunnyStorageAdapter implements FilesystemAdapter
     {
         $entry = $this->findEntry($path);
 
-        return new FileAttributes($path, null, null, $entry['last_modified'] ?? null);
+        return new FileAttributes($path, null, null, $entry['last_modified'] ?? null, null, ['checksum' => $entry['checksum'] ?? null]);
     }
 
     public function fileSize(string $path): FileAttributes
     {
         $entry = $this->findEntry($path);
 
-        return new FileAttributes($path, $entry['size'] ?? null);
+        return new FileAttributes($path, $entry['size'] ?? null, null, null, null, ['checksum' => $entry['checksum'] ?? null]);
     }
 
-    /** @return array{name: string, is_directory: bool, size: int, last_modified: int}|null */
+    /** @return array{name: string, is_directory: bool, size: int, last_modified: int, checksum: string}|null */
     private function findEntry(string $path): ?array
     {
         $dir = dirname($path);
@@ -133,6 +133,8 @@ final class BunnyStorageAdapter implements FilesystemAdapter
                     $entry['size'],
                     null,
                     $entry['last_modified'],
+                    null,
+                    ['checksum' => $entry['checksum']],
                 );
             }
         }

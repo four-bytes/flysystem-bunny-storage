@@ -71,8 +71,8 @@ final class BunnyStorageAdapterTest extends TestCase
     public function testDeleteDirectoryDeletesAllContainedFiles(): void
     {
         $this->client->method('list')->with('dir/sub')->willReturn([
-            ['name' => 'dir/sub/a.txt', 'is_directory' => false, 'size' => 10, 'last_modified' => 0],
-            ['name' => 'dir/sub/b.txt', 'is_directory' => false, 'size' => 20, 'last_modified' => 0],
+            ['name' => 'dir/sub/a.txt', 'is_directory' => false, 'size' => 10, 'last_modified' => 0, 'checksum' => ''],
+            ['name' => 'dir/sub/b.txt', 'is_directory' => false, 'size' => 20, 'last_modified' => 0, 'checksum' => ''],
         ]);
         $this->client->expects($this->exactly(2))->method('delete')
             ->with($this->logicalOr('dir/sub/a.txt', 'dir/sub/b.txt'));
@@ -163,8 +163,8 @@ final class BunnyStorageAdapterTest extends TestCase
     public function testListContentsFlat(): void
     {
         $this->client->method('list')->with('dir')->willReturn([
-            ['name' => 'dir/a.txt', 'is_directory' => false, 'size' => 100, 'last_modified' => 1700000000],
-            ['name' => 'dir/b.txt', 'is_directory' => false, 'size' => 200, 'last_modified' => 1700000001],
+            ['name' => 'dir/a.txt', 'is_directory' => false, 'size' => 100, 'last_modified' => 1700000000, 'checksum' => 'abc123'],
+            ['name' => 'dir/b.txt', 'is_directory' => false, 'size' => 200, 'last_modified' => 1700000001, 'checksum' => 'def456'],
         ]);
 
         $results = iterator_to_array($this->adapter->listContents('dir', false));
@@ -178,7 +178,7 @@ final class BunnyStorageAdapterTest extends TestCase
     public function testListContentsFlatDoesNotRecurseIntoSubdirectories(): void
     {
         $this->client->expects($this->once())->method('list')->with('dir')->willReturn([
-            ['name' => 'dir/sub/', 'is_directory' => true, 'size' => 0, 'last_modified' => 0],
+            ['name' => 'dir/sub/', 'is_directory' => true, 'size' => 0, 'last_modified' => 0, 'checksum' => ''],
         ]);
 
         $results = iterator_to_array($this->adapter->listContents('dir', false));
@@ -191,11 +191,11 @@ final class BunnyStorageAdapterTest extends TestCase
     {
         $this->client->method('list')->willReturnMap([
             ['dir', [
-                ['name' => 'dir/sub/', 'is_directory' => true, 'size' => 0, 'last_modified' => 0],
-                ['name' => 'dir/root.txt', 'is_directory' => false, 'size' => 10, 'last_modified' => 0],
+                ['name' => 'dir/sub/', 'is_directory' => true, 'size' => 0, 'last_modified' => 0, 'checksum' => ''],
+                ['name' => 'dir/root.txt', 'is_directory' => false, 'size' => 10, 'last_modified' => 0, 'checksum' => ''],
             ]],
             ['dir/sub/', [
-                ['name' => 'dir/sub/child.txt', 'is_directory' => false, 'size' => 5, 'last_modified' => 0],
+                ['name' => 'dir/sub/child.txt', 'is_directory' => false, 'size' => 5, 'last_modified' => 0, 'checksum' => ''],
             ]],
         ]);
 
