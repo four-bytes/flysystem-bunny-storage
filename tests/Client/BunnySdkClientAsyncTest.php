@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Four\Flysystem\BunnyStorage\Tests\Client;
 
 use Bunny\Storage\Client as BunnySdkClient;
+use Bunny\Storage\Exception as BunnyException;
 use Four\Flysystem\BunnyStorage\Client\AsyncBunnyClientInterface;
 use Four\Flysystem\BunnyStorage\Client\BunnySdkClient as OurClient;
 use Four\Flysystem\BunnyStorage\Config\BunnyStorageConfig;
+use Four\Flysystem\BunnyStorage\Exception\TransientBunnyException;
 use GuzzleHttp\Promise\FulfilledPromise;
 use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Promise\RejectedPromise;
@@ -133,5 +135,32 @@ final class BunnySdkClientAsyncTest extends TestCase
             });
 
         $this->client->uploadAsync('content.txt', 'expected content')->wait();
+    }
+
+    public function testUploadAsyncCleansTempFileOnSynchronousThrow(): void
+    {
+        $capturedLocalPath = null;
+        $sdkError = new BunnyException('could not open local file');
+
+        $this->sdk->expects($this->once())
+            ->method('uploadAsync')
+            ->with(
+                $this->callback(function (string $localPath) use (&$capturedLocalPath): bool {
+                    $capturedLocalPath = $localPath;
+                    return true;
+                }),
+                'sync-fail.txt',
+            )
+            ->willThrowException($sdkError);
+
+        try {
+            $this->client->uploadAsync('sync-fail.txt', 'data');
+            $this->fail('Expected TransientBunnyException not thrown');
+        } catch (TransientBunnyException $e) {
+            $this->assertSame($sdkError, $e->getPrevious());
+        }
+
+        $this->assertNotNull($capturedLocalPath);
+        $this->assertFileDoesNotExist($capturedLocalPath);
     }
 }

@@ -77,19 +77,34 @@ final class BunnySdkClient implements AsyncBunnyClientInterface
             throw UnableToWriteFile::atLocation($path, 'could not write to temporary file');
         }
 
-        return $this->sdk->uploadAsync($tmpFile, $path)
-            ->then(
-                function (mixed $value) use ($tmpFile): mixed {
-                    @unlink($tmpFile);
-                    return $value;
-                },
-                function (mixed $reason) use ($tmpFile): void {
-                    @unlink($tmpFile);
-                    throw $reason instanceof \Throwable
-                        ? $reason
-                        : new \RuntimeException('Upload failed: ' . (string) $reason);
+        try {
+            $promise = $this->sdk->uploadAsync($tmpFile, $path);
+        } catch (AuthenticationException $e) {
+            @unlink($tmpFile);
+            throw UnableToWriteFile::atLocation($path, 'authentication failed', $e);
+        } catch (BunnyException $e) {
+            @unlink($tmpFile);
+            throw new TransientBunnyException("Upload failed for '{$path}': {$e->getMessage()}", 0, $e);
+        }
+
+        return $promise->then(
+            function (mixed $value) use ($tmpFile): mixed {
+                @unlink($tmpFile);
+                return $value;
+            },
+            function (mixed $reason) use ($tmpFile, $path): never {
+                @unlink($tmpFile);
+                if ($reason instanceof AuthenticationException) {
+                    throw UnableToWriteFile::atLocation($path, 'authentication failed', $reason);
                 }
-            );
+                if ($reason instanceof BunnyException) {
+                    throw new TransientBunnyException("Upload failed for '{$path}': {$reason->getMessage()}", 0, $reason);
+                }
+                throw $reason instanceof \Throwable
+                    ? $reason
+                    : new \RuntimeException('Upload failed: ' . (string) $reason);
+            }
+        );
     }
 
     public function download(string $path): string
