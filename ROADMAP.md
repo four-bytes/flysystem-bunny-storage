@@ -71,7 +71,7 @@ Generic Flysystem v3 adapter for the Bunny Storage API. No Shopware dependency �
 - `mimeType()` is extension-based only — Bunny Storage does not expose `Content-Type` in list responses
 - `visibility()` always returns no value — Bunny Storage has no per-object ACL
 - `directoryExists()` lists the directory to check non-empty; empty directories are not representable in Bunny Storage
-- All file I/O (`upload`, `download`, `copy`) buffers the entire file as a PHP string — Bunny SDK v3 uses string-based `putContents`/`getContents`. Large files will exhaust memory. Use `uploadAsync` (temp-file bridge) for large uploads where the async flow is acceptable.
+- All file I/O (`upload`, `download`, `copy`) buffers the entire file as a PHP string — Bunny SDK v3 uses string-based `putContents`/`getContents`. Large files will exhaust memory. `uploadAsync` writes content to a temp file before calling the SDK, but still calls `stream_get_contents()` internally for resource inputs, so it does not reduce peak memory usage — it only provides a non-blocking HTTP upload via Guzzle promises.
 
 ## Acceptance criteria
 
