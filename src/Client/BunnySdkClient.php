@@ -131,6 +131,7 @@ final class BunnySdkClient implements BunnyClientInterface
                 'is_directory' => $item->isDirectory(),
                 'size' => $item->getSize(),
                 'last_modified' => $item->getDateModified()->getTimestamp(),
+                'checksum' => $item->getChecksum(),
             ];
         }
 

@@ -20,7 +20,7 @@ interface BunnyClientInterface
 
     public function directoryExists(string $path): bool;
 
-    /** @return array<int, array{name: string, is_directory: bool, size: int, last_modified: int}> */
+    /** @return array<int, array{name: string, is_directory: bool, size: int, last_modified: int, checksum: string}> */
     public function list(string $path): array;
 
     public function move(string $from, string $to): void;
