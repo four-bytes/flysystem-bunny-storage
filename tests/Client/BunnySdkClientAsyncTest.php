@@ -107,8 +107,8 @@ final class BunnySdkClientAsyncTest extends TestCase
         try {
             $this->client->uploadAsync('fail.txt', 'data')->wait();
             $this->fail('Expected exception not thrown');
-        } catch (\RuntimeException $e) {
-            $this->assertSame('network error', $e->getMessage());
+        } catch (TransientBunnyException $e) {
+            $this->assertSame($error, $e->getPrevious());
         }
 
         $this->assertNotNull($capturedLocalPath);

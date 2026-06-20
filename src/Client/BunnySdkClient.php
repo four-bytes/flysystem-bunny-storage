@@ -82,6 +82,9 @@ final class BunnySdkClient implements AsyncBunnyClientInterface
         } catch (AuthenticationException $e) {
             @unlink($tmpFile);
             throw UnableToWriteFile::atLocation($path, 'authentication failed', $e);
+        } catch (FileNotFoundException $e) {
+            @unlink($tmpFile);
+            throw UnableToWriteFile::atLocation($path, 'file not found', $e);
         } catch (BunnyException $e) {
             @unlink($tmpFile);
             throw new TransientBunnyException("Upload failed for '{$path}': {$e->getMessage()}", 0, $e);
@@ -100,11 +103,14 @@ final class BunnySdkClient implements AsyncBunnyClientInterface
                 if ($reason instanceof AuthenticationException) {
                     throw UnableToWriteFile::atLocation($path, 'authentication failed', $reason);
                 }
+                if ($reason instanceof FileNotFoundException) {
+                    throw UnableToWriteFile::atLocation($path, 'file not found', $reason);
+                }
                 if ($reason instanceof BunnyException) {
                     throw new TransientBunnyException("Upload failed for '{$path}': {$reason->getMessage()}", 0, $reason);
                 }
                 throw $reason instanceof \Throwable
-                    ? $reason
+                    ? new TransientBunnyException("Upload failed for '{$path}': {$reason->getMessage()}", 0, $reason)
                     : new \RuntimeException('Upload failed: ' . (string) $reason);
             }
         );
