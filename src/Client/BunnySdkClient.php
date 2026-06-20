@@ -225,6 +225,10 @@ final class BunnySdkClient implements AsyncBunnyClientInterface
             $this->delete($from);
         } catch (UnableToCopyFile $e) {
             throw UnableToMoveFile::fromLocationTo($from, $to, $e);
+        } catch (UnableToDeleteFile $e) {
+            throw UnableToMoveFile::fromLocationTo($from, $to, $e);
+        } catch (TransientBunnyException $e) {
+            throw UnableToMoveFile::fromLocationTo($from, $to, $e);
         }
     }
 

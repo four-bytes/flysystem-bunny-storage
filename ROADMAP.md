@@ -36,7 +36,7 @@ Generic Flysystem v3 adapter for the Bunny Storage API. No Shopware dependency �
 - [x] `setVisibility()` — no-op (not supported)
 - [x] `directoryExists()` — delegates to `client->directoryExists()`
 - [x] `listContents()` recursive mode — `yield from` subdirectory listing
-- [ ] `deleteDirectory()` — currently calls `client->delete(path/)` which may not cascade; Bunny has no directory delete; needs recursive object enumeration + delete loop
+- [x] `deleteDirectory()` — recursive object enumeration + delete loop (Bunny has no directory delete API)
 
 ## Phase 3 — Exception translation ✅
 
@@ -68,7 +68,6 @@ Generic Flysystem v3 adapter for the Bunny Storage API. No Shopware dependency �
 
 ## Known limitations
 
-- `deleteDirectory()` may not work recursively on Bunny (needs enumeration loop)
 - `mimeType()` is extension-based only — Bunny Storage does not expose `Content-Type` in list responses
 - `visibility()` always returns no value — Bunny Storage has no per-object ACL
 - `directoryExists()` lists the directory to check non-empty; empty directories are not representable in Bunny Storage
