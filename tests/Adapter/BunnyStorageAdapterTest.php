@@ -9,6 +9,7 @@ use Four\Flysystem\BunnyStorage\Client\BunnyClientInterface;
 use League\Flysystem\Config;
 use League\Flysystem\DirectoryAttributes;
 use League\Flysystem\FileAttributes;
+use League\Flysystem\UnableToRetrieveMetadata;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -146,18 +147,44 @@ final class BunnyStorageAdapterTest extends TestCase
         $this->assertSame('file.txt', $attrs->path());
     }
 
-    public function testLastModifiedReturnsFileAttributes(): void
+    public function testLastModifiedThrowsWhenFileNotFound(): void
     {
-        $attrs = $this->adapter->lastModified('file.txt');
+        $this->client->method('list')->willReturn([]);
 
-        $this->assertInstanceOf(FileAttributes::class, $attrs);
+        $this->expectException(UnableToRetrieveMetadata::class);
+        $this->adapter->lastModified('missing.txt');
     }
 
-    public function testFileSizeReturnsFileAttributes(): void
+    public function testLastModifiedReturnsTimestampWhenFound(): void
     {
-        $attrs = $this->adapter->fileSize('file.txt');
+        $this->client->method('list')->willReturn([
+            ['name' => 'dir/file.txt', 'is_directory' => false, 'size' => 100, 'last_modified' => 1700000000, 'checksum' => 'abc'],
+        ]);
 
-        $this->assertInstanceOf(FileAttributes::class, $attrs);
+        $attrs = $this->adapter->lastModified('dir/file.txt');
+
+        $this->assertSame(1700000000, $attrs->lastModified());
+        $this->assertSame('abc', $attrs->extraMetadata()['checksum']);
+    }
+
+    public function testFileSizeThrowsWhenFileNotFound(): void
+    {
+        $this->client->method('list')->willReturn([]);
+
+        $this->expectException(UnableToRetrieveMetadata::class);
+        $this->adapter->fileSize('missing.txt');
+    }
+
+    public function testFileSizeReturnsSizeWhenFound(): void
+    {
+        $this->client->method('list')->willReturn([
+            ['name' => 'dir/file.txt', 'is_directory' => false, 'size' => 512, 'last_modified' => 0, 'checksum' => 'def'],
+        ]);
+
+        $attrs = $this->adapter->fileSize('dir/file.txt');
+
+        $this->assertSame(512, $attrs->fileSize());
+        $this->assertSame('def', $attrs->extraMetadata()['checksum']);
     }
 
     public function testListContentsFlat(): void

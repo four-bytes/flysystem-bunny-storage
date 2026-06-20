@@ -10,6 +10,7 @@ use League\Flysystem\DirectoryAttributes;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\StorageAttributes;
+use League\Flysystem\UnableToRetrieveMetadata;
 use League\MimeTypeDetection\ExtensionMimeTypeDetector;
 
 final class BunnyStorageAdapter implements FilesystemAdapter
@@ -92,14 +93,22 @@ final class BunnyStorageAdapter implements FilesystemAdapter
     {
         $entry = $this->findEntry($path);
 
-        return new FileAttributes($path, null, null, $entry['last_modified'] ?? null, null, ['checksum' => $entry['checksum'] ?? null]);
+        if ($entry === null) {
+            throw UnableToRetrieveMetadata::lastModified($path, 'file not found');
+        }
+
+        return new FileAttributes($path, null, null, $entry['last_modified'], null, ['checksum' => $entry['checksum']]);
     }
 
     public function fileSize(string $path): FileAttributes
     {
         $entry = $this->findEntry($path);
 
-        return new FileAttributes($path, $entry['size'] ?? null, null, null, null, ['checksum' => $entry['checksum'] ?? null]);
+        if ($entry === null) {
+            throw UnableToRetrieveMetadata::fileSize($path, 'file not found');
+        }
+
+        return new FileAttributes($path, $entry['size'], null, null, null, ['checksum' => $entry['checksum']]);
     }
 
     /** @return array{name: string, is_directory: bool, size: int, last_modified: int, checksum: string}|null */
