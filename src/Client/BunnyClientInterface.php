@@ -6,19 +6,22 @@ namespace Four\Flysystem\BunnyStorage\Client;
 
 interface BunnyClientInterface
 {
-    public function upload(string $remotePath, mixed $content): void;
+    /** @param string|resource $content */
+    public function upload(string $path, mixed $content): void;
 
-    public function download(string $remotePath): string;
+    public function download(string $path): string;
 
     /** @return resource */
-    public function downloadStream(string $remotePath): mixed;
+    public function downloadStream(string $path): mixed;
 
-    public function delete(string $remotePath): void;
+    public function delete(string $path): void;
 
-    public function exists(string $remotePath): bool;
+    public function exists(string $path): bool;
+
+    public function directoryExists(string $path): bool;
 
     /** @return array<int, array{name: string, is_directory: bool, size: int, last_modified: int}> */
-    public function list(string $remotePath): array;
+    public function list(string $path): array;
 
     public function move(string $from, string $to): void;
 

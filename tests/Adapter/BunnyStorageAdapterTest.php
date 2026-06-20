@@ -33,6 +33,9 @@ final class BunnyStorageAdapterTest extends TestCase
     public function testWriteStreamDelegatesToClient(): void
     {
         $stream = fopen('php://memory', 'r+');
+        if ($stream === false) {
+            self::fail('Could not open memory stream');
+        }
         $this->client->expects($this->once())->method('upload')->with('dir/file.txt', $stream);
 
         $this->adapter->writeStream('dir/file.txt', $stream, new Config());
@@ -49,6 +52,9 @@ final class BunnyStorageAdapterTest extends TestCase
     public function testReadStreamDelegatesToClient(): void
     {
         $stream = fopen('php://memory', 'r');
+        if ($stream === false) {
+            self::fail('Could not open memory stream');
+        }
         $this->client->method('downloadStream')->with('dir/file.txt')->willReturn($stream);
 
         $this->assertSame($stream, $this->adapter->readStream('dir/file.txt'));
@@ -62,18 +68,24 @@ final class BunnyStorageAdapterTest extends TestCase
         $this->adapter->delete('dir/file.txt');
     }
 
-    public function testDeleteDirectoryAppendsTrailingSlash(): void
+    public function testDeleteDirectoryDeletesAllContainedFiles(): void
     {
-        $this->client->expects($this->once())->method('delete')->with('dir/sub/');
+        $this->client->method('list')->with('dir/sub')->willReturn([
+            ['name' => 'dir/sub/a.txt', 'is_directory' => false, 'size' => 10, 'last_modified' => 0],
+            ['name' => 'dir/sub/b.txt', 'is_directory' => false, 'size' => 20, 'last_modified' => 0],
+        ]);
+        $this->client->expects($this->exactly(2))->method('delete')
+            ->with($this->logicalOr('dir/sub/a.txt', 'dir/sub/b.txt'));
 
         $this->adapter->deleteDirectory('dir/sub');
     }
 
-    public function testDeleteDirectoryStripsExtraTrailingSlash(): void
+    public function testDeleteDirectoryOnEmptyDirectoryDeletesNothing(): void
     {
-        $this->client->expects($this->once())->method('delete')->with('dir/sub/');
+        $this->client->method('list')->with('dir/empty')->willReturn([]);
+        $this->client->expects($this->never())->method('delete');
 
-        $this->adapter->deleteDirectory('dir/sub/');
+        $this->adapter->deleteDirectory('dir/empty');
     }
 
     public function testFileExistsDelegatesToClient(): void
@@ -83,9 +95,9 @@ final class BunnyStorageAdapterTest extends TestCase
         $this->assertTrue($this->adapter->fileExists('file.txt'));
     }
 
-    public function testDirectoryExistsAppendsTrailingSlash(): void
+    public function testDirectoryExistsDelegatesToClientDirectoryExists(): void
     {
-        $this->client->method('exists')->with('dir/')->willReturn(true);
+        $this->client->method('directoryExists')->with('dir')->willReturn(true);
 
         $this->assertTrue($this->adapter->directoryExists('dir'));
     }
