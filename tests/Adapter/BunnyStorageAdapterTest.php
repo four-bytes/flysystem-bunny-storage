@@ -173,6 +173,8 @@ final class BunnyStorageAdapterTest extends TestCase
         $this->assertInstanceOf(FileAttributes::class, $results[0]);
         $this->assertSame('dir/a.txt', $results[0]->path());
         $this->assertSame(100, $results[0]->fileSize());
+        $this->assertSame('abc123', $results[0]->extraMetadata()['checksum']);
+        $this->assertSame('def456', $results[1]->extraMetadata()['checksum']);
     }
 
     public function testListContentsFlatDoesNotRecurseIntoSubdirectories(): void
