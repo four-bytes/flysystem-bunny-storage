@@ -85,6 +85,9 @@ final class BunnySdkClient implements AsyncBunnyClientInterface
         } catch (BunnyException $e) {
             @unlink($tmpFile);
             throw new TransientBunnyException("Upload failed for '{$path}': {$e->getMessage()}", 0, $e);
+        } catch (\Throwable $e) {
+            @unlink($tmpFile);
+            throw $e;
         }
 
         return $promise->then(
